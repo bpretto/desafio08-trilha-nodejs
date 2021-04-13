@@ -3,6 +3,7 @@ import { AuthenticateUserUseCase } from "../../../users/useCases/authenticateUse
 import { CreateUserUseCase } from "../../../users/useCases/createUser/CreateUserUseCase";
 import { InMemoryStatementsRepository } from "../../repositories/in-memory/InMemoryStatementsRepository";
 import { CreateStatementUseCase } from "../createStatement/CreateStatementUseCase";
+import { GetBalanceError } from "./GetBalanceError";
 import { GetBalanceUseCase } from "./GetBalanceUseCase";
 
 
@@ -17,6 +18,7 @@ let inMemoryStatementsRepository: InMemoryStatementsRepository
 describe("Get Balance", () => {
     beforeEach(() => {
         inMemoryUsersRepository = new InMemoryUsersRepository();
+        inMemoryStatementsRepository = new InMemoryStatementsRepository();
         createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
         authenticateUserUseCase = new AuthenticateUserUseCase(inMemoryUsersRepository);
         createStatementUseCase = new CreateStatementUseCase(inMemoryUsersRepository, inMemoryStatementsRepository)
@@ -34,19 +36,28 @@ describe("Get Balance", () => {
 
         const authenticatedUser = await authenticateUserUseCase.execute(user);
 
-        const user_id = authenticatedUser.user.id as string
-        enum OperationType {
-            DEPOSIT = 'deposit',
-            WITHDRAW = 'withdraw',
-        }
-        const type = OperationType.DEPOSIT
-        const amount = 100
-        const description = 'sample description'
+        const user_id = authenticatedUser.user.id as string;
 
-        await createStatementUseCase.execute({ user_id, type, amount, description })
+        const userBalance = await getBalanceUseCase.execute({ user_id });
 
-        const userBalance = await getBalanceUseCase.execute({ user_id })
+        await createStatementUseCase.execute({
+            user_id,
+            type: 'deposit' as any,
+            amount: 100,
+            description: "sample description"
+        });
 
-        console.log(userBalance)
+        const userBalance2 = await getBalanceUseCase.execute({ user_id });
+
+        expect(userBalance.balance).toBe(0)
+        expect(userBalance2.balance).toBe(100)
+    });
+
+    it("Should not be able to get balance of unexisting user", async () => {
+        expect(async () => {
+            const user_id = "wrongid"
+
+            await getBalanceUseCase.execute({ user_id });
+        }).rejects.toBeInstanceOf(GetBalanceError)
     });
 });
