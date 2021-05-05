@@ -2,8 +2,9 @@ import { InMemoryUsersRepository } from "../../../users/repositories/in-memory/I
 import { AuthenticateUserUseCase } from "../../../users/useCases/authenticateUser/AuthenticateUserUseCase";
 import { CreateUserUseCase } from "../../../users/useCases/createUser/CreateUserUseCase";
 import { InMemoryStatementsRepository } from "../../repositories/in-memory/InMemoryStatementsRepository";
-import { CreateStatementError } from "./CreateStatementError";
-import { CreateStatementUseCase } from "./CreateStatementUseCase";
+import { CreateStatementUseCase } from "../createStatement/CreateStatementUseCase";
+import { GetStatementOperationUseCase } from "./GetStatementOperationUseCase";
+import { GetStatementOperationError } from "./GetStatementOperationError";
 
 
 let createUserUseCase: CreateUserUseCase;
@@ -11,18 +12,19 @@ let authenticateUserUseCase: AuthenticateUserUseCase;
 let createStatementUseCase: CreateStatementUseCase
 let inMemoryUsersRepository: InMemoryUsersRepository;
 let inMemoryStatementsRepository: InMemoryStatementsRepository
+let getStatementOperationUseCase: GetStatementOperationUseCase;
 
-
-describe("Get Balance", () => {
+describe("Get Statement Operation", () => {
     beforeEach(() => {
         inMemoryUsersRepository = new InMemoryUsersRepository();
         inMemoryStatementsRepository = new InMemoryStatementsRepository();
         createUserUseCase = new CreateUserUseCase(inMemoryUsersRepository);
         authenticateUserUseCase = new AuthenticateUserUseCase(inMemoryUsersRepository);
         createStatementUseCase = new CreateStatementUseCase(inMemoryUsersRepository, inMemoryStatementsRepository)
+        getStatementOperationUseCase = new GetStatementOperationUseCase(inMemoryUsersRepository, inMemoryStatementsRepository)
     });
 
-    it("Should be able to create deposit statement", async () => {
+    it("Should be able to get statement operation", async () => {
         const user = {
             name: "sample name",
             email: "sample@email.com",
@@ -43,56 +45,15 @@ describe("Get Balance", () => {
         };
 
         const statement = await createStatementUseCase.execute(statementOperation);
+        const statement_id = statement.id as string;
 
-        expect(statement).toHaveProperty("id")
+
+        const getStatementOperation = await getStatementOperationUseCase.execute({ statement_id, user_id });
+
+        expect(getStatementOperation).toHaveProperty("id");
     });
 
-    it("Should be able to create withdraw statement", async () => {
-        const user = {
-            name: "sample name",
-            email: "sample@email.com",
-            password: "password"
-        };
-
-        await createUserUseCase.execute(user);
-
-        const authenticatedUser = await authenticateUserUseCase.execute(user);
-
-        const user_id = authenticatedUser.user.id as string;
-
-        const depositOperation = {
-            user_id,
-            type: 'deposit' as any,
-            amount: 100,
-            description: "sample description"
-        };
-
-        const withdrawOperation = {
-            user_id,
-            type: 'withdraw' as any,
-            amount: 100,
-            description: "sample description"
-        };
-
-        await createStatementUseCase.execute(depositOperation);
-
-        const statement = await createStatementUseCase.execute(withdrawOperation);
-
-        expect(statement).toHaveProperty('id');
-    });
-
-    it("Should not be able to create statement with unexisting user", async () => {
-        expect(async () => {
-            await createStatementUseCase.execute({
-                user_id: "wrongid",
-                type: 'deposit' as any,
-                amount: 100,
-                description: "sample description"
-            });
-        }).rejects.toBeInstanceOf(CreateStatementError.UserNotFound)
-    });
-
-    it("Should not be able to create withdraw statement from insufficiently funded account", async () => {
+    it("Should not be able to get unexisting statement operation", async () => {
         expect(async () => {
             const user = {
                 name: "sample name",
@@ -106,14 +67,10 @@ describe("Get Balance", () => {
 
             const user_id = authenticatedUser.user.id as string;
 
-            const statementOperation = {
-                user_id,
-                type: 'withdraw' as any,
-                amount: 100,
-                description: "sample description"
-            };
+            const statement_id = "id";
 
-            await createStatementUseCase.execute(statementOperation);
-        }).rejects.toBeInstanceOf(CreateStatementError.InsufficientFunds);
+            await getStatementOperationUseCase.execute({ statement_id, user_id });
+
+        }).rejects.toBeInstanceOf(GetStatementOperationError.StatementNotFound);
     });
 });
